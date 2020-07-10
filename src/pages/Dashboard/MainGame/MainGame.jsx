@@ -18,6 +18,7 @@ import playAudioFunction from '../../../utils/playAudioFunction';
 import {
   createUserWord, updateUserWord, getAllUserWords,
 } from '../../../services/userWords';
+import { getUserStatistics, upsertUserStatistics } from '../../../services/userStatistics';
 
 class MainGame extends PureComponent {
   state = {
@@ -33,6 +34,12 @@ class MainGame extends PureComponent {
     difficultyBtnActive: false,
     inputValue: '',
   };
+
+  currentStatistic = null;
+
+  // changeCurrentStatistic = (optionalValue, value) => {
+  //   this.currentStatistic.optional.today[optionalValue] += value;
+  // }
 
   changePopupShowState = (value) => {
     this.setState({
@@ -83,7 +90,7 @@ class MainGame extends PureComponent {
   };
 
   initCardComponent = (wordData) => {
-    console.log(wordData);
+    // console.log(wordData);
     const { changeCardToLeft } = this;
     const {
       settingsData, showRightAnswer, wordsData, currentWordIndex, indicator, inputClasses,
@@ -122,6 +129,7 @@ class MainGame extends PureComponent {
           type="button"
           key={2}
           onClick={() => {
+            console.log(this.currentStatistic);
             console.log(settingsData);
             if (autoPronunciation) {
               playAudioFunction(`https://raw.githubusercontent.com/Koptohhka/rslang-data/master/${audio}`);
@@ -138,8 +146,8 @@ class MainGame extends PureComponent {
                 deleted: false,
                 difficult: difficultValue,
                 indicator: indicatorValue,
-                lastTrained: today,
-                nextTraining: tomorrow,
+                lastTrained: today.toLocaleDateString(),
+                nextTraining: tomorrow.toLocaleDateString(),
                 trained: trainedValue,
               },
             };
@@ -151,10 +159,21 @@ class MainGame extends PureComponent {
               createUserWord(wordsData[currentWordIndex]._id, body);
             }
             this.setInputClassesAndReadState('Input Input--default', true);
-            this.setIndicator(userWord);
+            this.setIndicator(userWord, indicatorValue);
             this.setShowRightAnswer(true);
             this.setState({
               inputValue: word,
+            });
+            if (!userWord) {
+              this.currentStatistic.optional.today.newWords += 1;
+            }
+            // this.changeCurrentStatistic('cards', 1);
+            this.currentStatistic.optional.today.cards += 1;
+            this.currentStatistic.optional.today.finishWordsLeft -= 1;
+            upsertUserStatistics(this.currentStatistic);
+            console.log(this.currentStatistic);
+            getUserStatistics().then((res) => {
+              console.log(res);
             });
           }}
         >
@@ -176,13 +195,14 @@ class MainGame extends PureComponent {
         <div className="MainGame__indicator-container">
           {userWord
             ? <Indicator indicator={indicator} />
-            : <Indicator indicator={1} />}
+            : <Indicator indicator={indicator} />}
         </div>
         <div className="MainGame__container">
           <div className="MainGame__flex-wrapper">
             <div className="MainGame__sentence-wrapper">
               <p className="MainGame__card-sentence">
                 <Input
+                  currentStatistic={this.currentStatistic}
                   autoPronunciation={autoPronunciation}
                   clearInputValue={this.clearInputValue}
                   currentWordIndex={currentWordIndex}
@@ -219,8 +239,8 @@ class MainGame extends PureComponent {
                           deleted: false,
                           difficult: true,
                           indicator: indicatorValue,
-                          lastTrained: today,
-                          nextTraining: tomorrow,
+                          lastTrained: today.toLocaleDateString(),
+                          nextTraining: tomorrow.toLocaleDateString(),
                           trained: trainedValue,
                         },
                       };
@@ -259,8 +279,8 @@ class MainGame extends PureComponent {
                         deleted: true,
                         difficult: false,
                         indicator: indicatorValue,
-                        lastTrained: new Date(),
-                        nextTraining: new Date(),
+                        lastTrained: new Date().toLocaleDateString(),
+                        nextTraining: new Date().toLocaleDateString(),
                         trained: trainedValue,
                       },
                     };
@@ -322,6 +342,7 @@ class MainGame extends PureComponent {
                 this.setState({
                   currentWordIndex: currentWordIndex + 1,
                   showRightAnswer: false,
+                  difficultyBtnActive: false,
                 });
               } else {
                 this.changePopupShowState(true);
@@ -349,39 +370,84 @@ class MainGame extends PureComponent {
     this.setState({
       settingsData: setingsData.optional,
     });
-    const filter = {
-      $or: [
-        {
-          $and: [
-            { 'userWord.optional.indicator': 2 },
-            { 'userWord.optional.deleted': false },
-          ],
+
+    const statisticsData = await getUserStatistics();
+    const { optional } = statisticsData;
+    console.log(optional.today);
+
+    if (optional.today.date !== new Date().toLocaleDateString()) {
+      const todayStatistic = {
+        learnedWords: 0,
+        optional: {
+          today: {
+            date: new Date().toLocaleDateString(),
+            cards: 0,
+            newWords: 0,
+            rightAnswers: 0,
+            longestChain: 0,
+            finishWordsLeft: setingsData.optional.maxCardsPerDay,
+          },
         },
-        {
-          $and: [
-            { 'userWord.optional.indicator': 3 },
-            { 'userWord.optional.deleted': false },
-          ],
-        },
-        {
-          $and: [
-            { 'userWord.optional.indicator': 4 },
-            { 'userWord.optional.deleted': false },
-          ],
-        },
-        { userWord: null },
-      ],
-    };
-    //
-    // const date = new Date();
-    // console.log(date.toLocaleDateString());
-    //
+      };
+      this.currentStatistic = todayStatistic;
+      upsertUserStatistics(todayStatistic);
+      // { 'userWord.optional.nextTraining': new Date().toLocaleDateString() }
+    } else {
+      const userStatistics = await getUserStatistics();
+      // console.log(userStatistics);
+      delete userStatistics.id;
+      this.currentStatistic = userStatistics;
+    }
+
+    let wordsdataLengthValue = this.currentStatistic.optional.today.finishWordsLeft;
+    if (this.currentStatistic.optional.today.finishWordsLeft < 1) {
+      this.currentStatistic.optional.today.finishWordsLeft = setingsData.optional.maxCardsPerDay;
+      wordsdataLengthValue = setingsData.optional.maxCardsPerDay;
+    }
 
     const wordsDataResponse = await getUserAggregatedWords(
-      JSON.stringify(filter), setingsData.optional.maxCardsPerDay,
+      JSON.stringify({
+        $and: [
+          {
+            $or: [
+              {
+                $and: [
+                  { 'userWord.optional.nextTraining': new Date().toLocaleDateString() },
+                ],
+              },
+              {
+                $and: [
+                  { 'userWord.optional.indicator': 2 },
+                  { 'userWord.optional.deleted': false },
+                ],
+              },
+              {
+                $and: [
+                  { 'userWord.optional.indicator': 3 },
+                  { 'userWord.optional.deleted': false },
+                ],
+              },
+              {
+                $and: [
+                  { 'userWord.optional.indicator': 4 },
+                  { 'userWord.optional.deleted': false },
+                ],
+              },
+              { userWord: null },
+            ],
+          },
+          {
+            $and: [
+              {
+                'userWord.optional.lastTrained': { $ne: new Date().toLocaleDateString() },
+              },
+            ],
+          },
+        ],
+      }), wordsdataLengthValue,
     );
     const todayWordData = shuffleArray(wordsDataResponse[0].paginatedResults);
-
+    console.log(wordsDataResponse);
     this.setIndicator(todayWordData[0].userWord);
     this.setState({
       wordsData: todayWordData,
@@ -423,3 +489,39 @@ class MainGame extends PureComponent {
 }
 
 export default MainGame;
+
+/**
+ *
+ *
+ *  {
+          $or: [
+            {
+              $and: [
+                { 'userWord.optional.nextTraining': new Date().toLocaleDateString() },
+              ],
+            },
+            {
+              $and: [
+                { 'userWord.optional.indicator': 2 },
+                { 'userWord.optional.deleted': false },
+              ],
+            },
+            {
+              $and: [
+                { 'userWord.optional.indicator': 3 },
+                { 'userWord.optional.deleted': false },
+              ],
+            },
+            {
+              $and: [
+                { 'userWord.optional.indicator': 4 },
+                { 'userWord.optional.deleted': false },
+              ],
+            },
+            { userWord: null },
+          ],
+        }
+ *
+ *
+ *
+ */

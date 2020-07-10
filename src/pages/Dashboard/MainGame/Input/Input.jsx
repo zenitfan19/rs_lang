@@ -6,12 +6,13 @@ import {
   createUserWord, updateUserWord,
 } from '../../../../services/userWords';
 import playAudioFunction from '../../../../utils/playAudioFunction';
+import { upsertUserStatistics } from '../../../../services/userStatistics';
 
 const Input = (props) => {
   const {
     textExample, wordData, changeRightAnswerState, exampleSentence, userWord,
     setIndicator, autoPronunciation, inputValue, setInputClassesAndReadState,
-    inputClasses, inputReadOnlyFlag, clearInputValue,
+    inputClasses, inputReadOnlyFlag, clearInputValue, currentStatistic,
   } = props;
   const { word, _id, audio } = wordData;
   let leftAndRightPartsOfSentce;
@@ -58,14 +59,23 @@ const Input = (props) => {
       playAudioFunction(`https://raw.githubusercontent.com/Koptohhka/rslang-data/master/${audio}`);
     }
     if (input.toLowerCase() === word.toLowerCase()) {
+      currentStatistic.optional.today.rightAnswers += 1;
       setInputClassesAndReadState('Input Input--right', true);
       postUserWordData(5, 1);
       changeRightAnswerState(true);
     } else {
+      indicatorValue = userWord?.optional?.indicator || 2;
       setInputClassesAndReadState('Input Input--wrong', true);
       postUserWordData(2, 0);
       changeRightAnswerState(true);
     }
+    if (!userWord) {
+      currentStatistic.optional.today.newWords += 1;
+    }
+    currentStatistic.optional.today.cards += 1;
+    currentStatistic.optional.today.finishWordsLeft -= 1;
+    upsertUserStatistics(currentStatistic);
+    console.log(currentStatistic);
   };
 
   return (

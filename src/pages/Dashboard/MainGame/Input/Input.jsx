@@ -12,7 +12,7 @@ const Input = (props) => {
   const {
     textExample, wordData, changeRightAnswerState, exampleSentence, userWord,
     setIndicator, autoPronunciation, inputValue, setInputClassesAndReadState,
-    inputClasses, inputReadOnlyFlag, clearInputValue, currentStatistic,
+    inputClasses, inputReadOnlyFlag, clearInputValue, currentStatistic, bestChainCounter,
   } = props;
   const { word, _id, audio } = wordData;
   let leftAndRightPartsOfSentce;
@@ -59,11 +59,18 @@ const Input = (props) => {
       playAudioFunction(`https://raw.githubusercontent.com/Koptohhka/rslang-data/master/${audio}`);
     }
     if (input.toLowerCase() === word.toLowerCase()) {
+      bestChainCounter.count += 1;
+      console.log(bestChainCounter.count);
+      if (currentStatistic.optional.today.longestChain < bestChainCounter.count) {
+        currentStatistic.optional.today.longestChain = bestChainCounter.count;
+        console.log(currentStatistic.optional.today.longestChain);
+      }
       currentStatistic.optional.today.rightAnswers += 1;
       setInputClassesAndReadState('Input Input--right', true);
       postUserWordData(5, 1);
       changeRightAnswerState(true);
     } else {
+      bestChainCounter.count = 0;
       indicatorValue = userWord?.optional?.indicator || 2;
       setInputClassesAndReadState('Input Input--wrong', true);
       postUserWordData(2, 0);

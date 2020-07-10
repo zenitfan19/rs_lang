@@ -30,7 +30,7 @@ const TodayStatistics = (props) => {
         </li>
         <li className="TodayStatistics__list-item">
           Лучшая серия
-          <p className="TodayStatistics__number--green">n</p>
+          <p className="TodayStatistics__number--green">{longestChain}</p>
         </li>
       </ul>
     </div>

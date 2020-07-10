@@ -37,11 +37,13 @@ class Dashboard extends React.PureComponent {
     this.cardsPerDay = userSettingData.optional.maxCardsPerDay;
     console.log(userSettingData.optional.maxCardsPerDay);
     const inProgressWords = await getUserAggregatedWords(filters.inProgress);
-    const learnedWords = await getUserAggregatedWords(filters.inProgress);
+    const learnedWords = await getUserAggregatedWords(filters.learnedWords);
     this.totalStatistics = {
-      inProgressWordsCount: inProgressWords[0].totalCount[0].count,
-      learnedWordsCount: learnedWords[0].totalCount[0].count,
+      inProgressWordsCount: inProgressWords[0]?.totalCount[0]?.count || 0,
+      learnedWordsCount: learnedWords[0]?.totalCount[0]?.count || 0,
     };
+    // console.log(inProgressWords);
+    // console.log(learnedWords);
 
     let userStatisticsRequest = await getUserStatistics();
     if (!userStatisticsRequest) {

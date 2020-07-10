@@ -13,14 +13,60 @@ import getUserAggregatedWords from '../../../services/userAggregatedWords';
 import shuffleArray from '../../../utils/suffleArray';
 import { getUserSettings } from '../../../services/settingsService';
 import playAudioFunction from '../../../utils/playAudioFunction';
-// import { getWordByPageAndDifficultyNumber, getWordsByPa
-// geCount } from '../../../services/getWords';
 import {
   createUserWord, updateUserWord, getAllUserWords,
 } from '../../../services/userWords';
 import { getUserStatistics, upsertUserStatistics } from '../../../services/userStatistics';
 
+const filterMainGame = {
+  $and: [
+    {
+      $and: [
+        {
+          $or: [
+            {
+              $and: [
+                { 'userWord.optional.nextTraining': new Date().toLocaleDateString() },
+              ],
+            },
+            {
+              $and: [
+                { 'userWord.optional.indicator': 2 },
+                { 'userWord.optional.deleted': false },
+              ],
+            },
+            {
+              $and: [
+                { 'userWord.optional.indicator': 3 },
+                { 'userWord.optional.deleted': false },
+              ],
+            },
+            {
+              $and: [
+                { 'userWord.optional.indicator': 4 },
+                { 'userWord.optional.deleted': false },
+              ],
+            },
+            { userWord: null },
+          ],
+        },
+      ],
+    },
+    {
+      $and: [
+        {
+          'userWord.optional.lastTrained': { $ne: new Date().toLocaleDateString() },
+        },
+      ],
+    },
+  ],
+};
+
 class MainGame extends PureComponent {
+  currentStatistic = null;
+
+  bestChainCounter = { count: 0 };
+
   state = {
     showPopup: false,
     settingsData: null,
@@ -34,12 +80,6 @@ class MainGame extends PureComponent {
     difficultyBtnActive: false,
     inputValue: '',
   };
-
-  currentStatistic = null;
-
-  // changeCurrentStatistic = (optionalValue, value) => {
-  //   this.currentStatistic.optional.today[optionalValue] += value;
-  // }
 
   changePopupShowState = (value) => {
     this.setState({
@@ -167,14 +207,11 @@ class MainGame extends PureComponent {
             if (!userWord) {
               this.currentStatistic.optional.today.newWords += 1;
             }
-            // this.changeCurrentStatistic('cards', 1);
+            this.bestChainCounter.count = 0;
             this.currentStatistic.optional.today.cards += 1;
             this.currentStatistic.optional.today.finishWordsLeft -= 1;
             upsertUserStatistics(this.currentStatistic);
             console.log(this.currentStatistic);
-            getUserStatistics().then((res) => {
-              console.log(res);
-            });
           }}
         >
           Показать ответ
@@ -202,6 +239,7 @@ class MainGame extends PureComponent {
             <div className="MainGame__sentence-wrapper">
               <p className="MainGame__card-sentence">
                 <Input
+                  bestChainCounter={this.bestChainCounter}
                   currentStatistic={this.currentStatistic}
                   autoPronunciation={autoPronunciation}
                   clearInputValue={this.clearInputValue}
@@ -266,34 +304,36 @@ class MainGame extends PureComponent {
                   alt="delete-icon"
                   src={deleteIcon}
                   onClick={() => {
-                    this.setInputClassesAndReadState('Input', false);
-                    this.setIndicator(userWord);
-                    this.setShowRightAnswer(false);
-                    this.setState({
-                      inputValue: '',
-                    });
-                    const indicatorValue = userWord?.optional?.indicator || 1;
-                    const trainedValue = userWord?.optional?.trained || 1;
-                    const body = {
-                      optional: {
-                        deleted: true,
-                        difficult: false,
-                        indicator: indicatorValue,
-                        lastTrained: new Date().toLocaleDateString(),
-                        nextTraining: new Date().toLocaleDateString(),
-                        trained: trainedValue,
-                      },
-                    };
-                    try {
-                      if (userWord.optional.indicator < 5) {
-                        console.log(userWord.optional.indicator);
-                        updateUserWord(wordsData[currentWordIndex]._id, body);
+                    if (currentWordIndex !== wordsData.length - 1) {
+                      this.setInputClassesAndReadState('Input', false);
+                      this.setIndicator(userWord);
+                      this.setShowRightAnswer(false);
+                      this.setState({
+                        inputValue: '',
+                      });
+                      const indicatorValue = userWord?.optional?.indicator || 1;
+                      const trainedValue = userWord?.optional?.trained || 1;
+                      const body = {
+                        optional: {
+                          deleted: true,
+                          difficult: false,
+                          indicator: indicatorValue,
+                          lastTrained: new Date().toLocaleDateString(),
+                          nextTraining: new Date().toLocaleDateString(),
+                          trained: trainedValue,
+                        },
+                      };
+                      try {
+                        if (userWord.optional.indicator < 5) {
+                          console.log(userWord.optional.indicator);
+                          updateUserWord(wordsData[currentWordIndex]._id, body);
+                        }
+                      } catch {
+                        createUserWord(wordsData[currentWordIndex]._id, body);
+                        console.log('Слова нит');
                       }
-                    } catch {
-                      createUserWord(wordsData[currentWordIndex]._id, body);
-                      console.log('Слова нит');
+                      changeCardToLeft();
                     }
-                    changeCardToLeft();
                   }}
                   className="MainGame__delete-button"
                 />
@@ -344,8 +384,13 @@ class MainGame extends PureComponent {
                   showRightAnswer: false,
                   difficultyBtnActive: false,
                 });
-              } else {
+              } else if (!this.currentStatistic.optional.today.isFinished) {
                 this.changePopupShowState(true);
+                this.currentStatistic.optional.today.isFinished = true;
+                upsertUserStatistics(this.currentStatistic);
+                console.log(this.currentStatistic);
+              } else {
+                console.log(this.props);
               }
             }}
             className="MainGame__right-arrow"
@@ -391,60 +436,23 @@ class MainGame extends PureComponent {
       };
       this.currentStatistic = todayStatistic;
       upsertUserStatistics(todayStatistic);
-      // { 'userWord.optional.nextTraining': new Date().toLocaleDateString() }
     } else {
       const userStatistics = await getUserStatistics();
-      // console.log(userStatistics);
       delete userStatistics.id;
       this.currentStatistic = userStatistics;
     }
 
     let wordsdataLengthValue = this.currentStatistic.optional.today.finishWordsLeft;
-    if (this.currentStatistic.optional.today.finishWordsLeft < 1) {
+    if (this.currentStatistic.optional.today.isFinished) {
+      wordsdataLengthValue = setingsData.optional.maxCardsPerDay;
+      console.log(wordsdataLengthValue);
+    } else if (this.currentStatistic.optional.today.finishWordsLeft < 1) {
       this.currentStatistic.optional.today.finishWordsLeft = setingsData.optional.maxCardsPerDay;
       wordsdataLengthValue = setingsData.optional.maxCardsPerDay;
     }
 
     const wordsDataResponse = await getUserAggregatedWords(
-      JSON.stringify({
-        $and: [
-          {
-            $or: [
-              {
-                $and: [
-                  { 'userWord.optional.nextTraining': new Date().toLocaleDateString() },
-                ],
-              },
-              {
-                $and: [
-                  { 'userWord.optional.indicator': 2 },
-                  { 'userWord.optional.deleted': false },
-                ],
-              },
-              {
-                $and: [
-                  { 'userWord.optional.indicator': 3 },
-                  { 'userWord.optional.deleted': false },
-                ],
-              },
-              {
-                $and: [
-                  { 'userWord.optional.indicator': 4 },
-                  { 'userWord.optional.deleted': false },
-                ],
-              },
-              { userWord: null },
-            ],
-          },
-          {
-            $and: [
-              {
-                'userWord.optional.lastTrained': { $ne: new Date().toLocaleDateString() },
-              },
-            ],
-          },
-        ],
-      }), wordsdataLengthValue,
+      JSON.stringify(filterMainGame), wordsdataLengthValue,
     );
     const todayWordData = shuffleArray(wordsDataResponse[0].paginatedResults);
     console.log(wordsDataResponse);
@@ -489,39 +497,3 @@ class MainGame extends PureComponent {
 }
 
 export default MainGame;
-
-/**
- *
- *
- *  {
-          $or: [
-            {
-              $and: [
-                { 'userWord.optional.nextTraining': new Date().toLocaleDateString() },
-              ],
-            },
-            {
-              $and: [
-                { 'userWord.optional.indicator': 2 },
-                { 'userWord.optional.deleted': false },
-              ],
-            },
-            {
-              $and: [
-                { 'userWord.optional.indicator': 3 },
-                { 'userWord.optional.deleted': false },
-              ],
-            },
-            {
-              $and: [
-                { 'userWord.optional.indicator': 4 },
-                { 'userWord.optional.deleted': false },
-              ],
-            },
-            { userWord: null },
-          ],
-        }
- *
- *
- *
- */

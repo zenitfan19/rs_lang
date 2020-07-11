@@ -27,12 +27,6 @@ class Dashboard extends React.PureComponent {
   }
 
   componentDidMount = async () => {
-    // getUserAggregatedWords(filters.inProgress).then((res) => {
-    //   console.log(res);
-    // });
-    // getUserAggregatedWords(filters.learnedWords).then((res) => {
-    //   console.log(res);
-    // });
     const userSettingData = await getUserSettings(localStorage.userToken, localStorage.userId);
     this.cardsPerDay = userSettingData.optional.maxCardsPerDay;
     console.log(userSettingData.optional.maxCardsPerDay);

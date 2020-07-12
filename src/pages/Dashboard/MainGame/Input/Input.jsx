@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './Input.scss';
 import getSentenceByTags from '../../../../utils/getSentenceByTags';
 import {
@@ -9,12 +9,32 @@ import playAudioFunction from '../../../../utils/playAudioFunction';
 import { upsertUserStatistics } from '../../../../services/userStatistics';
 
 const Input = (props) => {
+  // const [isFirstAnswerTrue, setFirstAnswerTrue] = useState(true);
+  // const [placeholderValue, setPlaceholderValue] = useState('');
   const {
-    textExample, wordData, changeRightAnswerState, exampleSentence, userWord,
-    setIndicator, autoPronunciation, inputValue, setInputClassesAndReadState,
-    inputClasses, inputReadOnlyFlag, clearInputValue, currentStatistic, bestChainCounter,
+    isFirstAnswerRight,
+    inputPlaceHolder,
+    textExample,
+    wordData,
+    changeRightAnswerState,
+    exampleSentence,
+    userWord,
+    setIndicator,
+    autoPronunciation,
+    inputValue,
+    setInputClassesAndReadState,
+    inputClasses,
+    inputReadOnlyFlag,
+    clearInputValue,
+    currentStatistic,
+    bestChainCounter,
+    // test
+    setInputValue,
+    setFirstAnswerRigth,
+    setInputPlaceholder,
   } = props;
   const { word, _id, audio } = wordData;
+
   let leftAndRightPartsOfSentce;
   if (exampleSentence) {
     leftAndRightPartsOfSentce = getSentenceByTags(textExample);
@@ -23,12 +43,12 @@ const Input = (props) => {
   }
   const { leftpart, rightPart } = leftAndRightPartsOfSentce;
 
-  let indicatorValue = 5;
-  if (userWord) {
-    indicatorValue = userWord.optional.indicator + 1;
-  }
+  let indicatorValue;
+  // if (userWord) {
+  //   indicatorValue = userWord.optional.indicator + 1;
+  // }
 
-  const postUserWordData = (answerIndicatorValue, additionalIndicatorValue) => {
+  const postUserWordData = (answerIndicatorValue) => {
     const trainedValue = userWord?.optional?.trained + 1 || 1;
     const difficultValue = userWord?.optional?.difficult || false;
     const today = new Date();
@@ -39,17 +59,17 @@ const Input = (props) => {
       optional: {
         deleted: false,
         difficult: difficultValue,
-        indicator: indicatorValue,
+        indicator: answerIndicatorValue,
         lastTrained: today,
         nextTraining: tomorrow,
         trained: trainedValue,
       },
     };
     if (!userWord) {
-      setIndicator(null, answerIndicatorValue);
+      setIndicator(answerIndicatorValue);
       createUserWord(_id, body);
     } else {
-      setIndicator(userWord, userWord.optional.indicator + additionalIndicatorValue);
+      setIndicator(answerIndicatorValue);
       updateUserWord(_id, body);
     }
   };
@@ -58,23 +78,36 @@ const Input = (props) => {
     if (autoPronunciation) {
       playAudioFunction(`https://raw.githubusercontent.com/Koptohhka/rslang-data/master/${audio}`);
     }
+
     if (input.toLowerCase() === word.toLowerCase()) {
+      console.log(isFirstAnswerRight);
+      if ((isFirstAnswerRight === true) && !userWord) {
+        console.log('first');
+        indicatorValue = 5;
+      } else if ((isFirstAnswerRight === true) && userWord) {
+        console.log('second');
+        indicatorValue = userWord.optional.indicator + 1;
+      } else if (userWord) {
+        console.log('third');
+        indicatorValue = userWord.optional.indicator;
+      } else {
+        console.log('fourth');
+        indicatorValue = 2;
+      }
       bestChainCounter.count += 1;
-      console.log(bestChainCounter.count);
       if (currentStatistic.optional.today.longestChain < bestChainCounter.count) {
         currentStatistic.optional.today.longestChain = bestChainCounter.count;
-        console.log(currentStatistic.optional.today.longestChain);
       }
       currentStatistic.optional.today.rightAnswers += 1;
       setInputClassesAndReadState('Input Input--right', true);
-      postUserWordData(5, 1);
       changeRightAnswerState(true);
+      postUserWordData(indicatorValue);
     } else {
+      setFirstAnswerRigth(false);
+      setInputPlaceholder(word);
+      setInputValue('');
       bestChainCounter.count = 0;
       indicatorValue = userWord?.optional?.indicator || 2;
-      setInputClassesAndReadState('Input Input--wrong', true);
-      postUserWordData(2, 0);
-      changeRightAnswerState(true);
     }
     if (!userWord) {
       currentStatistic.optional.today.newWords += 1;
@@ -89,6 +122,7 @@ const Input = (props) => {
     <span>
       {leftpart}
       <input
+        placeholder={inputPlaceHolder}
         value={inputValue}
         readOnly={inputReadOnlyFlag}
         className={inputClasses}

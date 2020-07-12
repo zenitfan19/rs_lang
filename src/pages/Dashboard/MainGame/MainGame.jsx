@@ -86,7 +86,30 @@ class MainGame extends PureComponent {
       inputReadOnlyFlag: false,
       difficultyBtnActive: false,
       inputValue: '',
+      inputPlaceHolder: '',
+      isFirstAnswerRight: true,
     };
+  }
+
+  setFirstAnswerRigth = (value) => {
+    this.setState({
+      isFirstAnswerRight: value,
+    });
+  }
+
+  setInputPlaceholder = (value) => {
+    this.setState({
+      inputPlaceHolder: value,
+    });
+  }
+
+  changeCardToLeft = () => {
+    const { currentWordIndex, wordsData } = this.state;
+    const changeWordsData = wordsData.slice();
+    changeWordsData.splice(currentWordIndex, 1);
+    this.setState({
+      wordsData: changeWordsData,
+    });
   }
 
   changePopupShowState = (value) => {
@@ -108,15 +131,6 @@ class MainGame extends PureComponent {
     });
   };
 
-  changeCardToLeft = () => {
-    const { currentWordIndex, wordsData } = this.state;
-    const changeWordsData = wordsData.slice();
-    changeWordsData.splice(currentWordIndex, 1);
-    this.setState({
-      wordsData: changeWordsData,
-    });
-  }
-
   setCurrentIndex = (value) => {
     this.setState({
       currentWordIndex: value,
@@ -130,17 +144,18 @@ class MainGame extends PureComponent {
   }
 
   setInputValue = (value) => {
+    console.log(value);
     this.setState({
       inputValue: value,
     });
   }
 
-  setIndicator = (userWord, number) => {
-    let nextValue = 1;
-    if (number) {
-      nextValue = number;
-    } else if (userWord) {
-      nextValue = userWord.optional.indicator;
+  setIndicator = (value = 1) => {
+    // if (number) {
+    //   nextValue = number;
+    let nextValue = value;
+    if (typeof value === 'object') {
+      nextValue = value.optional.indicator;
     }
 
     this.setState({
@@ -167,10 +182,15 @@ class MainGame extends PureComponent {
       setInputValue,
       setDifficultyButtonState,
       currentStatistic,
+      setFirstAnswerRigth,
+      setInputPlaceholder,
+
     } = this;
     const {
       settingsData, showRightAnswer, wordsData, currentWordIndex, indicator, inputClasses,
       inputReadOnlyFlag, difficultyBtnActive, inputValue,
+      inputPlaceHolder,
+      isFirstAnswerRight,
     } = this.state;
 
     const {
@@ -207,6 +227,7 @@ class MainGame extends PureComponent {
           audio={audio}
           currentWordIndex={currentWordIndex}
           wordsData={wordsData}
+          wordData={wordData}
           setInputClassesAndReadState={setInputClassesAndReadState}
           setIndicator={setIndicator}
           setShowRightAnswer={setShowRightAnswer}
@@ -235,6 +256,11 @@ class MainGame extends PureComponent {
             <div className="MainGame__sentence-wrapper">
               <p className="MainGame__card-sentence">
                 <Input
+                  isFirstAnswerRight={isFirstAnswerRight}
+                  inputPlaceHolder={inputPlaceHolder}
+                  setInputPlaceholder={setInputPlaceholder}
+                  setFirstAnswerRigth={setFirstAnswerRigth}
+                  setInputValue={setInputValue}
                   bestChainCounter={this.bestChainCounter}
                   currentStatistic={this.currentStatistic}
                   autoPronunciation={autoPronunciation}
@@ -300,6 +326,8 @@ class MainGame extends PureComponent {
         </div>
         {showRightAnswer ? (
           <ArrowButton
+            setInputPlaceholder={setInputPlaceholder}
+            setFirstAnswerRigth={setFirstAnswerRigth}
             currentStatistic={currentStatistic}
             changePopupShowState={changePopupShowState}
             currentWordIndex={currentWordIndex}

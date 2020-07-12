@@ -1,4 +1,5 @@
 import React from 'react';
+import { withRouter } from 'react-router-dom';
 import { getUserStatistics, upsertUserStatistics } from '../../../../services/userStatistics';
 
 const ArrowButton = (props) => {
@@ -13,6 +14,8 @@ const ArrowButton = (props) => {
     setCurrentIndex,
     setShowRightAnswer,
     setDifficultyButtonState,
+    setInputPlaceholder,
+    setFirstAnswerRigth,
   } = props;
   return (
     <div
@@ -27,6 +30,8 @@ const ArrowButton = (props) => {
           setCurrentIndex(currentWordIndex + 1);
           setShowRightAnswer(false);
           setDifficultyButtonState(false);
+          setInputPlaceholder('');
+          setFirstAnswerRigth(true);
         } else if (!currentStatistic.optional.today.isFinished) {
           changePopupShowState(true);
           currentStatistic.optional.today.isFinished = true;
@@ -34,6 +39,7 @@ const ArrowButton = (props) => {
           console.log(currentStatistic);
         } else {
           console.log(props);
+          props.history.push('/');
         }
       }}
       className="MainGame__right-arrow"
@@ -51,4 +57,4 @@ const ArrowButton = (props) => {
   );
 };
 
-export default ArrowButton;
+export default withRouter(ArrowButton);

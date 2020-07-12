@@ -102,6 +102,16 @@ const Input = (props) => {
       setInputClassesAndReadState('Input Input--right', true);
       changeRightAnswerState(true);
       postUserWordData(indicatorValue);
+
+      if (!userWord) {
+        currentStatistic.optional.today.newWords += 1;
+        currentStatistic.optional.today.newWordsLeft -= 1;
+      }
+      currentStatistic.optional.today.maxWordsPerDayLeft -= 1;
+      currentStatistic.optional.today.cards += 1;
+      currentStatistic.optional.today.finishWordsLeft -= 1;
+      upsertUserStatistics(currentStatistic);
+      console.log(currentStatistic);
     } else {
       setFirstAnswerRigth(false);
       setInputPlaceholder(word);
@@ -109,13 +119,6 @@ const Input = (props) => {
       bestChainCounter.count = 0;
       indicatorValue = userWord?.optional?.indicator || 2;
     }
-    if (!userWord) {
-      currentStatistic.optional.today.newWords += 1;
-    }
-    currentStatistic.optional.today.cards += 1;
-    currentStatistic.optional.today.finishWordsLeft -= 1;
-    upsertUserStatistics(currentStatistic);
-    console.log(currentStatistic);
   };
 
   return (

@@ -62,7 +62,9 @@ const AnswerButton = (props) => {
         setInputValue(word);
         if (!userWord) {
           currentStatistic.optional.today.newWords += 1;
+          currentStatistic.optional.today.newWordsLeft -= 1;
         }
+        currentStatistic.optional.today.maxWordsPerDayLeft -= 1;
         bestChainCounter.count = 0;
         currentStatistic.optional.today.cards += 1;
         currentStatistic.optional.today.finishWordsLeft -= 1;

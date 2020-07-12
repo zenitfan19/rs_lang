@@ -67,6 +67,57 @@ const filterMainGame = {
   ],
 };
 
+const mainGameFilters = {
+  newWords: {
+    $and: [
+      { userWord: null },
+    ],
+  },
+  anyWords: {
+    $and: [
+      {
+        $and: [
+          {
+            $or: [
+              {
+                $and: [
+                  { 'userWord.optional.nextTraining': new Date().toLocaleDateString() },
+                ],
+              },
+              {
+                $and: [
+                  { 'userWord.optional.indicator': 2 },
+                  { 'userWord.optional.deleted': false },
+                ],
+              },
+              {
+                $and: [
+                  { 'userWord.optional.indicator': 3 },
+                  { 'userWord.optional.deleted': false },
+                ],
+              },
+              {
+                $and: [
+                  { 'userWord.optional.indicator': 4 },
+                  { 'userWord.optional.deleted': false },
+                ],
+              },
+              { userWord: null },
+            ],
+          },
+        ],
+      },
+      {
+        $and: [
+          {
+            'userWord.optional.lastTrained': { $ne: new Date().toLocaleDateString() },
+          },
+        ],
+      },
+    ],
+  },
+};
+
 class MainGame extends PureComponent {
   currentStatistic = null;
 
@@ -349,7 +400,7 @@ class MainGame extends PureComponent {
     this.setState({
       settingsData: setingsData.optional,
     });
-
+    console.log(setingsData);
     const statisticsData = await getUserStatistics();
     const { optional } = statisticsData;
     console.log(optional.today);
@@ -364,6 +415,8 @@ class MainGame extends PureComponent {
             newWords: 0,
             rightAnswers: 0,
             longestChain: 0,
+            newWordsLeft: setingsData.wordsPerDay,
+            maxWordsPerDayLeft: setingsData.optional.maxCardsPerDay,
             finishWordsLeft: setingsData.optional.maxCardsPerDay,
           },
         },
@@ -371,25 +424,71 @@ class MainGame extends PureComponent {
       this.currentStatistic = todayStatistic;
       upsertUserStatistics(todayStatistic);
     } else {
+      // timely
       const userStatistics = await getUserStatistics();
       delete userStatistics.id;
       this.currentStatistic = userStatistics;
+      console.log(this.currentStatistic);
+      // this.currentStatistic.optional.today.newWordsLeft = setingsData.wordsPerDay;
+      // this.currentStatistic.optional.today.maxWordsPerDayLeft = setingsData.optional.maxCardsPerDay;
     }
 
-    let wordsdataLengthValue = this.currentStatistic.optional.today.finishWordsLeft;
+    ///
+
+    /// /
+
+    let firstAlias = [];
+    let secondAlias = [];
+
+    const requestedDataLengths = {
+      newWordsLength: this.currentStatistic.optional.today.newWordsLeft,
+      maxWordsLength: this.currentStatistic.optional.today.maxWordsPerDayLeft,
+    };
+
+    const calculateMaxWordsLengthValue = () => {
+      let calculatedValue = requestedDataLengths.maxWordsLength - requestedDataLengths.newWordsLength;
+      console.log(requestedDataLengths.maxWordsLength);
+      console.log(requestedDataLengths.newWordsLength);
+      if (requestedDataLengths.maxWordsLength < requestedDataLengths.newWordsLength) {
+        calculatedValue = requestedDataLengths.maxWordsLength;
+      }
+      console.log('здесь расчет величин');
+      console.log(requestedDataLengths.newWordsLength);
+      console.log(calculatedValue);
+      console.log('здесь расчет величин');
+      return calculatedValue;
+    };
+
     if (this.currentStatistic.optional.today.isFinished) {
-      wordsdataLengthValue = setingsData.optional.maxCardsPerDay;
-      console.log(wordsdataLengthValue);
-    } else if (this.currentStatistic.optional.today.finishWordsLeft < 1) {
-      this.currentStatistic.optional.today.finishWordsLeft = setingsData.optional.maxCardsPerDay;
-      wordsdataLengthValue = setingsData.optional.maxCardsPerDay;
+      // wordsdataLengthValue = setingsData.optional.maxCardsPerDay;
+      requestedDataLengths.newWordsLength = setingsData.optional.maxCardsPerDay;
+      const maxWordsDataResponse = await getUserAggregatedWords(
+        JSON.stringify(mainGameFilters.anyWords), setingsData.optional.maxCardsPerDay,
+      );
+      secondAlias = maxWordsDataResponse[0].paginatedResults;
+    } else {
+      if (this.currentStatistic.optional.today.newWordsLeft > 0) {
+        const newWordsDataResponse = await getUserAggregatedWords(
+          JSON.stringify(mainGameFilters.newWords), requestedDataLengths.newWordsLength,
+        );
+        firstAlias = newWordsDataResponse[0].paginatedResults;
+      } else {
+        this.currentStatistic.optional.today.newWordsLeft = 0;
+      }
+
+      if (this.currentStatistic.optional.today.maxWordsPerDayLeft > 0) {
+        const maxWordsDataResponse = await getUserAggregatedWords(
+          JSON.stringify(mainGameFilters.anyWords), calculateMaxWordsLengthValue(),
+        );
+        secondAlias = maxWordsDataResponse[0].paginatedResults;
+      } else {
+        this.currentStatistic.optional.today.maxWordsPerDayLeft = 0;
+      }
     }
 
-    const wordsDataResponse = await getUserAggregatedWords(
-      JSON.stringify(filterMainGame), wordsdataLengthValue,
-    );
-    const todayWordData = shuffleArray(wordsDataResponse[0].paginatedResults);
-    console.log(wordsDataResponse);
+    const concatedArray = [...firstAlias, ...secondAlias];
+    console.log(concatedArray);
+    const todayWordData = shuffleArray(concatedArray);
     this.setIndicator(todayWordData[0].userWord);
     this.setState({
       wordsData: todayWordData,
